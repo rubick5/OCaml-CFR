@@ -4,10 +4,16 @@ type player = P1 | P2 [@@deriving show]
 type first_decision = Bet | Check [@@deriving show]
 type response = Fold | Call [@@deriving show]
 
+
+
 type game_cards = {
   p1_card : card;
   p2_card : card;
 } [@@deriving show]
+
+type action = BetOrCheck of first_decision
+  | FoldOrCall of response
+  | CardsDealt of game_cards
 
 type game_sequence =
   | P1CheckP2Check

@@ -42,3 +42,26 @@ let strategy_to_p2 (p : p2_strategy) : p2 = {
   face_check = first_from_weights p.facing_check_weights ;
   face_bet = response_from_weights p.facing_bet_weights
 }
+
+type infoset_id = {
+  player : player;
+  player_card : card;
+  history: action list;
+}
+
+type node = {
+  (* The float here gives the chance of going from our node to theirs?? *)
+  (* action is the action that takes us from our current state to them *)
+  (* storing action here allows us to traverse the tree using action history *)
+  children : (action * node * float) list;
+  history : action list;
+ infoset_id: infoset_id;
+}
+
+(* we will separately store a map from infoset id to strategy sum and regret sum *)
+type infoset_data = {
+  regret : float;
+  strategy_sum : float;
+}
+
+let h : (infoset_id, infoset_data) Hashtbl.t = Hashtbl.create 16
