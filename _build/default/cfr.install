@@ -1,8 +1,0 @@
-lib: [
-  "_build/install/default/lib/cfr/META"
-  "_build/install/default/lib/cfr/dune-package"
-  "_build/install/default/lib/cfr/opam"
-]
-bin: [
-  "_build/install/default/bin/cfr"
-]
