@@ -161,10 +161,10 @@ let dump (tbl: (infoset, infoset_data) Hashtbl.t) : table_dump =
 let print_table tbl = show_table_dump (dump tbl)
 
 
-let regret_match (regrets: (action * float) list) : (action * float) list =
+let regret_match (regrets : (action * float) list) : (action * float) list =
   let nums = List.map (fun (a, r) -> (a, Float.max 0.0 r)) regrets in
   let sum = List.fold_right (fun (_, r) acc -> acc +. r) nums 0.0 in
   if sum > 0.0 then
     List.map (fun (a, r) -> (a, r /. sum)) nums
   else
-    List.map (fun (a, _) -> (a, 1.0 /. sum)) nums
+    List.map (fun (a, _) -> (a, 1.0 /. (float (List.length regrets)))) nums
