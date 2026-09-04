@@ -22,8 +22,8 @@ let own_card (cs: game_cards) : player -> card = function
 
 
 
-let all_game_cards = List.concat_map (fun c -> (
-    List.map (fun c2 -> if c2 = c then Some {p1_card = c; p2_card = c2} else None) all_cards
+let all_game_cards : game_cards list = List.concat_map (fun c -> (
+    List.filter_map (fun c2 -> if c2 <> c then Some {p1_card = c; p2_card = c2} else None) all_cards
   )
 ) all_cards
 

@@ -15,5 +15,6 @@ let cards : Game.game_cards = {
 }
 
 let () =
-  let e = Game.run_game cards (Strategy.strategy_to_p1 s1) (Strategy.strategy_to_p2 s2)
-  in print_endline (Game.show_game_end_state e)
+  match Strategy.full_tree with
+    | Ok t -> print_endline (Strategy.show_game_tree t)
+    | Error s -> print_endline s 
