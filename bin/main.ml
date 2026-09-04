@@ -24,7 +24,4 @@ let () =
       print_endline (Strategy.show_game_tree t);
       let tbl = Strategy.build_regret_table t in
       print_endline (Strategy.print_table (tbl));
-      let entry = Hashtbl.find tbl infoset in
-      entry.regret.(0) <- 6.7;
-      print_endline (Strategy.print_table (tbl))
     | Error s -> print_endline s 

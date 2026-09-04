@@ -57,17 +57,15 @@ type infoset = {
 
 (* we will separately store a map from infoset id to strategy sum and regret sum *)
 type infoset_data = {
-  actions: action list;
-  regret : float array;
-  strategy_sum : float array;
+  regret : (action * float) list;
+  strategy_sum : (action * float) list;
 } [@@deriving show]
 
 let fresh_info_data (actions: action list) : infoset_data = 
-  let n = List.length actions in
+  let l = List.map (fun a -> (a, 0.0)) actions in
   {
-    actions;
-    regret = Array.make n 0.0;
-    strategy_sum = Array.make n 0.0;
+    regret = l;
+    strategy_sum = l;
   }
 
 type node =
@@ -161,3 +159,12 @@ let dump (tbl: (infoset, infoset_data) Hashtbl.t) : table_dump =
   Hashtbl.fold (fun k v acc -> (k, v) :: acc) tbl []
   |> List.sort (fun (a, _) (b, _) -> compare a b)
 let print_table tbl = show_table_dump (dump tbl)
+
+
+let regret_match (regrets: (action * float) list) : (action * float) list =
+  let nums = List.map (fun (a, r) -> (a, Float.max 0.0 r)) regrets in
+  let sum = List.fold_right (fun (_, r) acc -> acc +. r) nums 0.0 in
+  if sum > 0.0 then
+    List.map (fun (a, r) -> (a, r /. sum)) nums
+  else
+    List.map (fun (a, _) -> (a, 1.0 /. sum)) nums
