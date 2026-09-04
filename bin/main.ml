@@ -13,8 +13,18 @@ let cards : Game.game_cards = {
   p1_card = Game.Q;
   p2_card = Game.K;
 }
-
+let infoset: Strategy.infoset = {
+        player = Game.P1;
+        player_card = Game.J;
+        history = [];
+      }
 let () =
   match Strategy.full_tree with
-    | Ok t -> print_endline (Strategy.show_game_tree t)
+    | Ok t -> 
+      print_endline (Strategy.show_game_tree t);
+      let tbl = Strategy.build_regret_table t in
+      print_endline (Strategy.print_table (tbl));
+      let entry = Hashtbl.find tbl infoset in
+      entry.regret.(0) <- 6.7;
+      print_endline (Strategy.print_table (tbl))
     | Error s -> print_endline s 

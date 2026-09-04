@@ -57,9 +57,18 @@ type infoset = {
 
 (* we will separately store a map from infoset id to strategy sum and regret sum *)
 type infoset_data = {
-  regret : float;
-  strategy_sum : float;
+  actions: action list;
+  regret : float array;
+  strategy_sum : float array;
 } [@@deriving show]
+
+let fresh_info_data (actions: action list) : infoset_data = 
+  let n = List.length actions in
+  {
+    actions;
+    regret = Array.make n 0.0;
+    strategy_sum = Array.make n 0.0;
+  }
 
 type node =
   | PlayerChoice of history * G.player * infoset * (action * node) list
@@ -68,6 +77,13 @@ type node =
 
 type deal = { prob : float; cards : G.game_cards; subtree : node } [@@deriving show]
 type game_tree = deal list [@@deriving show]
+
+let rec node_for_each (f: node -> unit) (n: node) : unit =
+  f n;
+  match n with
+    | PlayerChoice (_, _, _,  ans) ->
+      List.iter (node_for_each f) (List.map snd ans)
+    | Terminal _ -> ()
 
 
 (* assumes the history has been legal so far *)
@@ -129,4 +145,19 @@ let full_tree : (game_tree, string) Result.t = traverse (fun cs ->
   G.all_game_cards
 
 
-let h : (infoset, infoset_data) Hashtbl.t = Hashtbl.create 16
+let build_regret_table (g: game_tree): (infoset, infoset_data) Hashtbl.t =
+  let tbl = Hashtbl.create 16 in
+  let use_node = function
+    | PlayerChoice (h, _, infoset, _) -> Hashtbl.replace tbl infoset (fresh_info_data (legal_actions h))
+    | Terminal _ -> ()
+  in
+  List.iter (fun { subtree; _ } ->
+    node_for_each use_node subtree
+  ) g;
+  tbl
+
+type table_dump = (infoset * infoset_data) list [@@deriving show]
+let dump (tbl: (infoset, infoset_data) Hashtbl.t) : table_dump =
+  Hashtbl.fold (fun k v acc -> (k, v) :: acc) tbl []
+  |> List.sort (fun (a, _) (b, _) -> compare a b)
+let print_table tbl = show_table_dump (dump tbl)
