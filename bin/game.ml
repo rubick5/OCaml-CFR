@@ -1,5 +1,10 @@
 type card = J | Q | K [@@deriving show]
+let all_cards = [J; Q; K]
 type player = P1 | P2 [@@deriving show]
+
+let other_player : player -> player = function
+  | P1 -> P2
+  | P2 -> P1
 
 type first_decision = Bet | Check [@@deriving show]
 type response = Fold | Call [@@deriving show]
@@ -11,9 +16,17 @@ type game_cards = {
   p2_card : card;
 } [@@deriving show]
 
-type action = BetOrCheck of first_decision
-  | FoldOrCall of response
-  | CardsDealt of game_cards
+let own_card (cs: game_cards) : player -> card = function
+  | P1 -> cs.p1_card
+  | P2 -> cs.p2_card
+
+
+
+let all_game_cards = List.concat_map (fun c -> (
+    List.map (fun c2 -> if c2 = c then Some {p1_card = c; p2_card = c2} else None) all_cards
+  )
+) all_cards
+
 
 type game_sequence =
   | P1CheckP2Check
