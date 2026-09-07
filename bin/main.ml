@@ -18,6 +18,21 @@ let infoset: Strategy.infoset = {
         player_card = Game.J;
         history = [];
       }
+
+
+let () =
+  match Strategy.full_tree with
+    | Ok t ->
+      let tbl = Strategy.build_regret_table t in
+      let new_tbl = Strategy.run_iterations 100000 tbl t in
+      let s = Strategy.extract_strategy new_tbl in
+      print_endline (Strategy.show_strategy s)
+
+
+    | Error s -> print_endline s
+
+
+(*
 let () =
   match Strategy.full_tree with
     | Ok t -> 
@@ -25,4 +40,4 @@ let () =
       let tbl = Strategy.build_regret_table t in
       print_endline (Strategy.print_table (tbl));
 
-    | Error s -> print_endline s 
+    | Error s -> print_endline s  *)

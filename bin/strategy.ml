@@ -76,6 +76,8 @@ type node =
 type deal = { prob : float; cards : G.game_cards; subtree : node } [@@deriving show]
 type game_tree = deal list [@@deriving show]
 
+type regret_table = (infoset, infoset_data) Hashtbl.t
+
 let rec node_for_each (f: node -> unit) (n: node) : unit =
   f n;
   match n with
@@ -143,7 +145,7 @@ let full_tree : (game_tree, string) Result.t = traverse (fun cs ->
   G.all_game_cards
 
 
-let build_regret_table (g: game_tree): (infoset, infoset_data) Hashtbl.t =
+let build_regret_table (g: game_tree): regret_table =
   let tbl = Hashtbl.create 16 in
   let use_node = function
     | PlayerChoice (h, _, infoset, _) -> Hashtbl.replace tbl infoset (fresh_info_data (legal_actions h))
@@ -168,3 +170,85 @@ let regret_match (regrets : (action * float) list) : (action * float) list =
     List.map (fun (a, r) -> (a, r /. sum)) nums
   else
     List.map (fun (a, _) -> (a, 1.0 /. (float (List.length regrets)))) nums
+
+(* WHAT COMES NEXT IS TRAVERSAL OF THE TREE!!!! *)
+
+let rec action_key (a : action) : ((action * 'a) list) -> 'a = function
+  | ((a2, f) :: rest) -> if a2 = a then f else action_key a rest
+  | [] -> failwith "called get_pi with an action that doesn't exist"
+
+let rec combine_regrets (r1 : (action * float) list) (r2 : (action * float) list) : (action * float) list =
+  let rec go (a : action) (f : float) : (action * float) list -> (action * float) list = function
+    | [] -> []
+    | ((a2, f2) :: rest) -> if a == a2 then (a, f +. f2) :: rest else (a2, f2) :: (go a f rest)
+  in
+  match r1 with
+    | [] -> r2
+    | ((a, f) :: afs) -> combine_regrets afs (go a f r2)
+
+(* this returns node_value !!! side effects: updates write_tbl as it goes through!!! *)
+let rec traversal_thing
+  (pi1: float)
+  (pi2: float)
+  (pic: float)
+  (n: node)
+  (tbl: regret_table)
+  (write_tbl : regret_table)
+  : float =
+  match n with
+    | PlayerChoice (_, p, i, ans) ->
+      let i_data = Hashtbl.find tbl i in
+      let s = regret_match (i_data.regret) in
+      let results = List.map (fun (a, n2) ->
+        let (new_pi1, new_pi2) = match p with
+          | P1 -> ((pi1 *. (action_key a s)), pi2)
+          | P2 -> (pi1, (pi2 *. (action_key a s)))
+        in
+        (a, traversal_thing new_pi1 new_pi2 pic n2 tbl write_tbl)
+      ) ans in
+      let node_val = List.map (fun (a, sa) ->
+        sa *. (action_key a results)
+      ) s |> List.fold_left (+.) 0.0 in
+      let (pii, piii_signed) = match p with
+        | P1 -> (pi1, pi2 *. pic)
+        | P2 -> (pi2, -.pi1 *. pic)
+      in
+      let r_cont = List.map (fun (a, v) ->
+        (a, piii_signed *. (v -. node_val))
+      ) results in
+      let strat_cont = List.map (fun (a, sa) ->
+        (a, pii *. sa)
+      ) s in
+
+      let write_tbl_data = Hashtbl.find write_tbl i in
+      let new_entry = {
+        regret = combine_regrets write_tbl_data.regret r_cont;
+        strategy_sum = combine_regrets write_tbl_data.strategy_sum strat_cont;
+      } in
+      (* WARNING: side effects here *)
+      Hashtbl.replace write_tbl i new_entry;
+      (* SIDE EFFECTS END *)
+      node_val
+    | Terminal (_, pay) -> float pay
+
+let run_iteration (tbl: regret_table) (gt: game_tree) : regret_table =
+  let write_tbl = Hashtbl.copy tbl in
+  List.iter (fun deal ->
+    let v = traversal_thing 1.0 1.0 deal.prob deal.subtree tbl write_tbl
+    in Printf.printf "%f\n" v
+  ) gt;
+  write_tbl
+
+
+let rec run_iterations (n: int) (tbl: regret_table) (gt: game_tree) : regret_table =
+  if n == 0 then tbl else run_iterations (n - 1) (run_iteration tbl gt) gt
+
+
+type strategy = (infoset * ((action * float) list)) list [@@deriving show]
+let extract_strategy (tbl : regret_table) : strategy =
+  Seq.map (fun (k, v) ->
+    let strat_sum_sum = List.fold_left (fun acc (a, f) -> f +. acc) 0.0 v.strategy_sum in
+    let normalised = List.map (fun (a, v) -> (a, v /. strat_sum_sum)) v.strategy_sum in
+    (k, normalised)
+  ) (Hashtbl.to_seq tbl)
+  |> List.of_seq
