@@ -4,3 +4,5 @@ type card = {
 value: value;
 suit : suit;
 } [@@deriving show]
+
+let ( >: ) c1 c2 = c1.value > c2.value

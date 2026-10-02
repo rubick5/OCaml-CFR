@@ -145,23 +145,24 @@ let round1_bet_size = 2;;
 let round2_bet_size = 4;;
 
 (* None means it's a chop *)
-let winning_player (p1c : Deck.card) (p2c : Deck.card) (b: Deck.card) : Player option =
-  if p1c = p2c then None
-  else if p1c = b | ((p1c > p2c) & p2c != b) P1
-  else P2
+let winning_player (p1c : Deck.card) (p2c : Deck.card) (b: Deck.card) : player option =
+  if p1c.value = p2c.value then None
+  else if p1c.value = b.value || (Deck.(p1c >: p2c) && p2c.value != b.value) then Some P1
+  else Some P2
 
 (*
 If the game hasn't terminated, gives None
 Otherwise, gives the positive payoff for P1
 *)
-let game_payoff (gs : game_state) -> int option =
+let game_payoff (gs : game_state) : int option =
+  Option.map (fun x -> x / 2) (
   match gs.game_history with
     | Nothing -> None
     | OneRound h -> 
-      match has_fold h with
+      (match has_fold h with
         | Some P2 -> Some (blind_size * 2 + pot_increase round1_bet_size h)
         | Some P1 -> Some (-(blind_size * 2 + pot_increase round1_bet_size h))
-        | None -> None
+        | None -> None)
     | TwoRounds (h1, h2) ->
       let sign = 
       match has_fold h2 with
@@ -170,13 +171,14 @@ let game_payoff (gs : game_state) -> int option =
         | None -> (* we go to showdown *)
           match gs.board with
             | Some b ->
-              match winning_player gs.p1_card gs.p2_card gs.board with
+              (match winning_player gs.p1_card gs.p2_card b with
                 | Some P1 -> 1
                 | Some P2 -> -1
-                | None -> 0
-            None -> failwith "invalid state... no board but second round"
+                | None -> 0)
+            | None -> failwith "invalid state... no board but second round"
       in
-      Some( sign *
+      Some( sign * (
       2 * blind_size + pot_increase round1_bet_size h1 +
-      pot_increase round2_bet_size h2
+      pot_increase round2_bet_size h2)
       )
+  )

@@ -1,4 +1,5 @@
 module G = Game
+open Result.Syntax
 
 type infoset_data = {
   regret : (G.action * float) list;
@@ -17,7 +18,7 @@ type node =
   | Chance of (float * node) list
   | Terminal of G.game_state * int
 
-let traverse (f : 'a -> ('b, 'e) result) (xs : 'a list) : ('b list, 'e) result =
+let rec traverse (f : 'a -> ('b, 'e) result) (xs : 'a list) : ('b list, 'e) result =
   match xs with
     | [] -> Ok []
     | (x :: xs) ->
