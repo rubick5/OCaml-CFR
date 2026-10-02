@@ -1,0 +1,4 @@
+(library
+  (name leduc)
+  (preprocess (pps ppx_deriving.std))
+)
