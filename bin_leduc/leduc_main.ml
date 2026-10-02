@@ -1,8 +1,15 @@
 open Leduc.Game
 
 let g : game_state = {
-  a = 5;
-  b = 10;
+  p1_card = { value = Deck.J ; suit = Deck.H };
+  p2_card = { value = Deck.Q ; suit = Deck.S };
+  round_history = P1BetP2Raise;
+  game_history = Nothing;
 }
 
-let () = print_endline (show_game_state g)
+let () =
+  List.iter (fun (a, g) ->
+    print_endline ("Action " ^ (show_action a) ^ " goes to:");
+    print_endline (show_game_state g);
+    print_endline "\n\n"
+  ) (legal_steps g)
