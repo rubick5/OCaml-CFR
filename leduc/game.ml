@@ -1,16 +1,3 @@
-module Deck = struct
-  type value = J | Q | K [@@deriving show]
-  type suit = H | S [@@deriving show]
-  type card = {
-    value: value;
-    suit : suit;
-  } [@@deriving show]
-  let size = 6
-end
-
-type round = One | Two [@@deriving show]
-
-
 type full_round_history =
   P1P2Check |
 
@@ -66,6 +53,14 @@ let legal_actions : round_history -> action list = function
   | P1BetP2Raise -> [Call ; Fold]
   | P2BetP1Raise -> [Call ; Fold]
 
+let turn : round_history -> player = function
+  | Nothing -> P1
+  | P1Check -> P2
+  | P1Bet -> P2
+  | P2Bet -> P1
+  | P1BetP2Raise -> P1
+  | P2BetP1Raise -> P2
+
 type either_history = (round_history, full_round_history) Either.t
 
 let apply_action (a : action) (r : round_history) :
@@ -101,3 +96,22 @@ let legal_steps (gs: game_state) : (action * game_state) list =
         in
         (a, { gs with round_history = new_rh; game_history = new_gh })
       ) (legal_actions gs.round_history)
+
+type infoset = {
+  player : player;
+  card_value : Deck.value; (* only card value because suit doesn't change the infoset *)
+  round_history : round_history;
+  game_history : game_history;
+} [@@deriving show]
+
+let infoset_from (gs: game_state) : infoset =
+  let card_value = match turn gs.round_history with
+    | P1 -> gs.p1_card.value
+    | P2 -> gs.p2_card.value
+  in
+  {
+    player = turn gs.round_history;
+    card_value;
+    round_history = gs.round_history;
+    game_history = gs.game_history;
+  }
