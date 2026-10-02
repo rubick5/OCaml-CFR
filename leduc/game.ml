@@ -14,6 +14,21 @@ type full_round_history =
   P1RaiseP2Fold [@@deriving show]
 
 
+type player = P1 | P2
+  [@@deriving show]
+
+let has_fold : full_round_history -> player option = function
+  | P1P2Check -> None
+  | P1BetP2Call -> None
+  | P2BetP1Call -> None
+  | P2RaiseP1Call -> None
+  | P1RaiseP2Call -> None
+
+  | P1BetP2Fold -> Some P2
+  | P2BetP1Fold -> Some P1
+  | P2RaiseP1Fold -> Some P1
+  | P1RaiseP2Fold -> Some P2
+
 type round_history =
   Nothing |
   P1Check |
@@ -22,8 +37,7 @@ type round_history =
   P1BetP2Raise |
   P2BetP1Raise [@@deriving show]
 
-type player = P1 | P2
-  [@@deriving show]
+
 type game_history =
   | Nothing
   | OneRound of full_round_history
@@ -87,6 +101,7 @@ let apply_action (a : action) (r : round_history) :
 let legal_steps (gs: game_state) : (action * game_state) list =
   match gs.game_history with
     | TwoRounds _ -> []
+    | OneRound h when has_fold h != None -> []
     | _ ->
       List.map ( fun a ->
         let (new_rh, new_gh) =
@@ -117,17 +132,6 @@ let infoset_from (gs: game_state) : infoset =
     game_history = gs.game_history;
   }
 
-let has_fold : full_round_history -> player option = function
-  | P1P2Check -> None
-  | P1BetP2Call -> None
-  | P2BetP1Call -> None
-  | P2RaiseP1Call -> None
-  | P1RaiseP2Call -> None
-
-  | P1BetP2Fold -> Some P2
-  | P2BetP1Fold -> Some P1
-  | P2RaiseP1Fold -> Some P1
-  | P1RaiseP2Fold -> Some P2
 
 let pot_increase (bet_size : int) : full_round_history -> int = function
   | P1P2Check -> 0
@@ -164,7 +168,7 @@ let game_payoff (gs : game_state) : int option =
         | Some P1 -> Some (-(blind_size * 2 + pot_increase round1_bet_size h))
         | None -> None)
     | TwoRounds (h1, h2) ->
-      let sign = 
+      let sign =
       match has_fold h2 with
         | Some P2 -> 1
         | Some P1 -> -1
