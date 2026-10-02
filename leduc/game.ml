@@ -12,7 +12,7 @@ type full_round_history =
 
   P1RaiseP2Call |
   P1RaiseP2Fold [@@deriving show]
-  
+
 
 type round_history =
   Nothing |
@@ -39,6 +39,7 @@ let add_full_round (nr : full_round_history) : game_history -> game_history =
 type game_state = {
   p1_card : Deck.card;
   p2_card : Deck.card;
+  board : Deck.card option;
   round_history : round_history;
   game_history : game_history;
 } [@@deriving show]
@@ -46,10 +47,10 @@ type game_state = {
 type action = Bet | Call | Fold | Check | Raise [@@deriving show]
 
 let legal_actions : round_history -> action list = function
-  | Nothing -> [Bet ; Check]
-  | P1Check -> [Bet ; Check]
-  | P1Bet   -> [Call ; Raise ; Fold]
-  | P2Bet -> [Call ; Raise ; Fold]
+  | Nothing       -> [Bet ; Check]
+  | P1Check       -> [Bet ; Check]
+  | P1Bet         -> [Call ; Raise ; Fold]
+  | P2Bet         -> [Call ; Raise ; Fold]
   | P1BetP2Raise -> [Call ; Fold]
   | P2BetP1Raise -> [Call ; Fold]
 
@@ -115,3 +116,67 @@ let infoset_from (gs: game_state) : infoset =
     round_history = gs.round_history;
     game_history = gs.game_history;
   }
+
+let has_fold : full_round_history -> player option = function
+  | P1P2Check -> None
+  | P1BetP2Call -> None
+  | P2BetP1Call -> None
+  | P2RaiseP1Call -> None
+  | P1RaiseP2Call -> None
+
+  | P1BetP2Fold -> Some P2
+  | P2BetP1Fold -> Some P1
+  | P2RaiseP1Fold -> Some P1
+  | P1RaiseP2Fold -> Some P2
+
+let pot_increase (bet_size : int) : full_round_history -> int = function
+  | P1P2Check -> 0
+  | P1BetP2Call -> bet_size * 2
+  | P1BetP2Fold -> 0
+  | P2BetP1Call -> bet_size * 2
+  | P2BetP1Fold -> 0
+  | P2RaiseP1Call -> bet_size * 4
+  | P2RaiseP1Fold -> bet_size * 2
+  | P1RaiseP2Call ->  bet_size * 4
+  | P1RaiseP2Fold -> bet_size * 2
+
+let blind_size = 1;;
+let round1_bet_size = 2;;
+let round2_bet_size = 4;;
+
+(* None means it's a chop *)
+let winning_player (p1c : Deck.card) (p2c : Deck.card) (b: Deck.card) : Player option =
+  if p1c = p2c then None
+  else if p1c = b | ((p1c > p2c) & p2c != b) P1
+  else P2
+
+(*
+If the game hasn't terminated, gives None
+Otherwise, gives the positive payoff for P1
+*)
+let game_payoff (gs : game_state) -> int option =
+  match gs.game_history with
+    | Nothing -> None
+    | OneRound h -> 
+      match has_fold h with
+        | Some P2 -> Some (blind_size * 2 + pot_increase round1_bet_size h)
+        | Some P1 -> Some (-(blind_size * 2 + pot_increase round1_bet_size h))
+        | None -> None
+    | TwoRounds (h1, h2) ->
+      let sign = 
+      match has_fold h2 with
+        | Some P2 -> 1
+        | Some P1 -> -1
+        | None -> (* we go to showdown *)
+          match gs.board with
+            | Some b ->
+              match winning_player gs.p1_card gs.p2_card gs.board with
+                | Some P1 -> 1
+                | Some P2 -> -1
+                | None -> 0
+            None -> failwith "invalid state... no board but second round"
+      in
+      Some( sign *
+      2 * blind_size + pot_increase round1_bet_size h1 +
+      pot_increase round2_bet_size h2
+      )

@@ -16,3 +16,14 @@ type node =
   | PlayerChoice of G.game_state * (G.action * node) list
   | Chance of (float * node) list
   | Terminal of G.game_state * int
+
+let traverse (f : 'a -> ('b, 'e) result) (xs : 'a list) : ('b list, 'e) result =
+  match xs with
+    | [] -> Ok []
+    | (x :: xs) ->
+      let* y = f x in (* let* is like v <- f x in haskell do notation *)
+      let* ys = traverse f xs in
+      Ok (y :: ys)
+
+let build (gs: G.game_state) : (node, string) Result.t =
+  failwith "TODO"
