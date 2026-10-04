@@ -58,6 +58,10 @@ type game_state = {
   game_history : game_history;
 } [@@deriving show]
 
+let own_card (p : player) (c1 : Deck.card) (c2 : Deck.card) = match p with
+  | P1 -> c1
+  | P2 -> c2
+
 type action = Bet | Call | Fold | Check | Raise [@@deriving show]
 
 let legal_actions : round_history -> action list = function
@@ -116,6 +120,7 @@ let legal_steps (gs: game_state) : (action * game_state) list =
 type infoset = {
   player : player;
   card_value : Deck.value; (* only card value because suit doesn't change the infoset *)
+  board : Deck.value option;
   round_history : round_history;
   game_history : game_history;
 } [@@deriving show]
@@ -128,10 +133,21 @@ let infoset_from (gs: game_state) : infoset =
   {
     player = turn gs.round_history;
     card_value;
+    board = Option.map (fun c -> Deck.(c.value)) gs.board;
     round_history = gs.round_history;
     game_history = gs.game_history;
   }
 
+let deal_board (gs : game_state) : (float * game_state) list =
+  let all_deals = List.filter_map (fun c ->
+      if c == gs.p1_card || c == gs.p2_card then
+        Some { gs with board = Some c }
+      else
+        None
+    ) Deck.all_cards
+  in
+  let p = 1.0 /. (float_of_int (List.length all_deals)) in
+  List.map (fun gs -> (p, gs)) all_deals
 
 let pot_increase (bet_size : int) : full_round_history -> int = function
   | P1P2Check -> 0

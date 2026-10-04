@@ -4,6 +4,7 @@ open Leduc
 let g : game_state = {
   p1_card = { value = Deck.J ; suit = Deck.H };
   p2_card = { value = Deck.Q ; suit = Deck.S };
+  board = None;
   round_history = P1BetP2Raise;
   game_history = Nothing;
 }

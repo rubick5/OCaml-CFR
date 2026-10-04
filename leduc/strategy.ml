@@ -26,5 +26,16 @@ let rec traverse (f : 'a -> ('b, 'e) result) (xs : 'a list) : ('b list, 'e) resu
       let* ys = traverse f xs in
       Ok (y :: ys)
 
-let build (gs: G.game_state) : (node, string) Result.t =
-  failwith "TODO"
+let rec build (gs: G.game_state) : (node, string) Result.t =
+  match G.game_payoff gs with
+    | Some payoff -> Ok (Terminal (gs, payoff))
+    | None ->
+      match (gs.game_history, gs.round_history) with
+        | (OneRound _, Nothing) -> (* we need to deal the board *)
+          Error "todo"
+        | _ ->
+          let* children : (G.action * node) list = traverse (fun (a, gs) ->
+            let* node = build gs in
+              Ok ((a, node))
+          ) (G.legal_steps gs) in
+          Ok (PlayerChoice (gs, children))
