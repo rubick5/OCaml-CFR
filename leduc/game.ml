@@ -58,6 +58,14 @@ type game_state = {
   game_history : game_history;
 } [@@deriving show]
 
+let start_game (c1 : Deck.card) (c2 : Deck.card) = {
+  p1_card = c1;
+  p2_card = c2;
+  board = None;
+  round_history = Nothing;
+  game_history = Nothing;
+}
+
 let own_card (p : player) (c1 : Deck.card) (c2 : Deck.card) = match p with
   | P1 -> c1
   | P2 -> c2
@@ -140,10 +148,10 @@ let infoset_from (gs: game_state) : infoset =
 
 let deal_board (gs : game_state) : (float * game_state) list =
   let all_deals = List.filter_map (fun c ->
-      if c == gs.p1_card || c == gs.p2_card then
-        Some { gs with board = Some c }
-      else
+      if c = gs.p1_card || c = gs.p2_card then
         None
+      else
+        Some { gs with board = Some c }
     ) Deck.all_cards
   in
   let p = 1.0 /. (float_of_int (List.length all_deals)) in

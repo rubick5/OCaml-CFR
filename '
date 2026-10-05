@@ -18,13 +18,6 @@ type node =
   | Chance of (float * node) list
   | Terminal of G.game_state * int [@@deriving show]
 
-let rec node_for_each (f : node -> unit) (n : node) : unit =
-  f n;
-  match n with
-    | PlayerChoice (_, ans) -> List.iter (node_for_each f) (List.map snd ans)
-    | Chance (rns) -> List.iter (node_for_each f) (List.map snd rns)
-    | Terminal _ -> ()
-
 let rec traverse (f : 'a -> ('b, 'e) result) (xs : 'a list) : ('b list, 'e) result =
   match xs with
     | [] -> Ok []
@@ -56,41 +49,16 @@ type deal = {
   p1_card : Deck.card;
   p2_card : Deck.card;
   node : node;
-} [@@deriving show]
+}
 
-type game_tree = deal list [@@deriving show]
+type game_tree = deal list
 
-let full_tree = List.concat_map (fun c1 ->
-  List.filter_map (fun c2 ->
-      if c1 = c2 then None else
-      Some ({
+let full_tree = List.map (fun c1 ->
+  List.map (fun c2 ->
+      {
         p1_card = c1;
         p2_card = c2;
-        node =
-          match build (G.start_game c1 c2) with
-            | Ok n -> n
-            | Error s -> failwith s
-      })
+        node = build (start_game c1 c2);
+      }
     ) Deck.all_cards
   ) Deck.all_cards
-
-type regret_table = (G.infoset, infoset_data) Hashtbl.t
-
-let build_regret_table (g : game_tree) : regret_table =
-  let tbl = Hashtbl.create 16 in
-  let use_node = function
-    | PlayerChoice (gs, ans) ->
-      Hashtbl.replace tbl (G.infoset_from gs) (fresh_info_data (List.map fst ans))
-    | Chance _ -> ()
-    | Terminal _ -> ()
-    in
-  List.iter (fun { node } ->
-    node_for_each use_node node
-  ) g;
-  tbl
-
-type table_dump = (G.infoset * infoset_data) list [@@deriving show]
-let dump (tbl: (G.infoset, infoset_data) Hashtbl.t) : table_dump =
-  Hashtbl.fold (fun k v acc -> (k, v) :: acc) tbl []
-  |> List.sort (fun (a, _) (b, _) -> compare a b)
-let print_table tbl = show_table_dump (dump tbl)

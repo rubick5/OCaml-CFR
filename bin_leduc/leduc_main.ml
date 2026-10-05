@@ -1,7 +1,7 @@
-open Leduc.Game
+open Leduc.Strategy
 open Leduc
 
-let g : game_state = {
+let g : G.game_state = {
   p1_card = { value = Deck.J ; suit = Deck.H };
   p2_card = { value = Deck.Q ; suit = Deck.S };
   board = None;
@@ -10,8 +10,7 @@ let g : game_state = {
 }
 
 let () =
-  List.iter (fun (a, g) ->
-    print_endline ("Action " ^ (show_action a) ^ " goes to:");
-    print_endline (show_game_state g);
-    print_endline "\n\n"
-  ) (legal_steps g)
+  (*print_endline (show_game_tree full_tree)*)
+  (* now to dump the infoset table *)
+  let i = build_regret_table full_tree in
+  print_endline (print_table i)
