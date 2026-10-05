@@ -12,5 +12,7 @@ let g : G.game_state = {
 let () =
   (*print_endline (show_game_tree full_tree)*)
   (* now to dump the infoset table *)
-  let i = build_regret_table full_tree in
-  print_endline (print_table i)
+  let tbl = build_regret_table full_tree in
+  let new_tbl = run_iterations 10000 tbl full_tree in
+  let s = extract_strategy new_tbl in
+  print_endline (show_strategy s)

@@ -94,3 +94,106 @@ let dump (tbl: (G.infoset, infoset_data) Hashtbl.t) : table_dump =
   Hashtbl.fold (fun k v acc -> (k, v) :: acc) tbl []
   |> List.sort (fun (a, _) (b, _) -> compare a b)
 let print_table tbl = show_table_dump (dump tbl)
+
+
+let regret_match (regrets : (G.action * float) list) : (G.action * float) list =
+  let nums = List.map (fun (a, r) -> (a, Float.max 0.0 r)) regrets in
+  let sum = List.fold_right (fun (_, r) acc -> acc +. r) nums 0.0 in
+  if sum > 0.0 then
+    List.map (fun (a, r) -> (a, r /. sum)) nums
+  else
+    List.map (fun (a, _) -> (a, 1.0 /. (float (List.length regrets)))) nums
+
+
+let rec action_key (a : G.action) : ((G.action * 'a) list) -> 'a = function
+  | ((a2, f) :: rest) -> if a2 = a then f else action_key a rest
+  | [] -> failwith "called get_pi with an action that doesn't exist"
+
+let rec combine_regrets (r1 : (G.action * float) list) (r2 : (G.action * float) list) : (G.action * float) list =
+  let rec go (a : G.action) (f : float) : (G.action * float) list -> (G.action * float) list = function
+    | [] -> []
+    | ((a2, f2) :: rest) -> if a = a2 then (a, f +. f2) :: rest else (a2, f2) :: (go a f rest)
+  in
+  match r1 with
+    | [] -> r2
+    | ((a, f) :: afs) -> combine_regrets afs (go a f r2)
+
+
+let rec traverse_game_tree
+  (pi1 : float)
+  (pi2 : float)
+  (pic : float)
+  (n : node)
+  (tbl : regret_table)
+  (write_tbl : regret_table)
+  : float =
+  match n with
+    | PlayerChoice (gs, ans) ->
+      let i = G.infoset_from gs in
+      let i_data = Hashtbl.find tbl i in
+      let s = regret_match (i_data.regret) in
+      let p = G.turn gs.round_history in
+      let results = List.map (fun (a, n2) ->
+        let (new_pi1, new_pi2) = match p with
+          | P1 -> ((pi1 *. (action_key a s)), pi2)
+          | P2 -> (pi1, (pi2 *. (action_key a s)))
+        in
+        (a, traverse_game_tree new_pi1 new_pi2 pic n2 tbl write_tbl)
+      ) ans in
+      let node_val = List.map (fun (a, sa) ->
+          sa *. (action_key a results)
+        ) s |> List.fold_left (+.) 0.0 in
+      let (pii, piii_signed) = match p with
+        | P1 -> (pi1, pi2 *. pic)
+        | P2 -> (pi2, -.pi1 *. pic)
+      in
+      let r_cont = List.map (fun (a, v) ->
+        (a, piii_signed *. (v -. node_val))
+      ) results in
+      let strat_cont = List.map (fun (a, sa) ->
+        (a, pii *. sa)
+      ) s in
+      let write_tbl_data = Hashtbl.find write_tbl i in
+      let new_entry = {
+        regret = combine_regrets write_tbl_data.regret r_cont;
+        strategy_sum = combine_regrets write_tbl_data.strategy_sum strat_cont;
+      } in
+      (* WARNING: side effects here *)
+      Hashtbl.replace write_tbl i new_entry;
+      (* SIDE EFFECTS END *)
+      node_val
+    | Chance rns ->
+      let results = List.map (fun (r, n2) ->
+        traverse_game_tree pi1 pi2 (pic *. r) n2 tbl write_tbl
+      ) rns in
+      (List.fold_left (+.) 0.0 results) /. (float_of_int (List.length results))
+    | Terminal (_, payoff) -> float payoff
+
+
+let run_iteration (tbl: regret_table) (gt: game_tree) : regret_table =
+  let write_tbl = Hashtbl.copy tbl in
+  let prob = 1.0 /. (float_of_int (List.length full_tree)) in
+  List.iter (fun deal ->
+    let _ = traverse_game_tree 1.0 1.0 prob deal.node tbl write_tbl
+    in () (*Printf.printf "%f\n" v *)
+  ) gt;
+  write_tbl
+
+
+let rec run_iterations (n: int) (tbl: regret_table) (gt: game_tree) : regret_table =
+  if n = 0 then tbl else run_iterations (n - 1) (run_iteration tbl gt) gt
+
+
+type strategy = (G.infoset * ((G.action * float) list)) list [@@deriving show]
+let extract_strategy (tbl : regret_table) : strategy =
+  Seq.map (fun (k, v) ->
+    let strat_sum_sum = List.fold_left (fun acc (a, f) -> f +. acc) 0.0 v.strategy_sum in
+    let normalised =
+      if strat_sum_sum > 0.0 then
+        List.map (fun (a, v) -> (a, v /. strat_sum_sum)) v.strategy_sum
+      else
+        List.map (fun (a, _) -> (a, 1.0 /. float_of_int (List.length v.strategy_sum))) v.strategy_sum
+    in
+    (k, normalised)
+  ) (Hashtbl.to_seq tbl)
+  |> List.of_seq
