@@ -2,4 +2,4 @@
  (public_name cfr)
  (name main)
  (preprocess (pps ppx_deriving.std))
- (libraries cfr))
+)
