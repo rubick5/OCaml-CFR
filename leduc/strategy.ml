@@ -105,7 +105,7 @@ let regret_match (regrets : (G.action * float) list) : (G.action * float) list =
     List.map (fun (a, _) -> (a, 1.0 /. (float (List.length regrets)))) nums
 
 
-let rec action_key (a : G.action) : ((G.action * 'a) list) -> 'a = function
+let rec action_key (a : 'b) : (('b * 'a) list) -> 'a = function
   | ((a2, f) :: rest) -> if a2 = a then f else action_key a rest
   | [] -> failwith "called get_pi with an action that doesn't exist"
 
